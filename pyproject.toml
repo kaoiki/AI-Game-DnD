@@ -11,6 +11,7 @@ dependencies = [
     "gunicorn>=25.1.0",
     "httpx>=0.28.1",
     "pydantic>=2.12.5",
+    "pydantic-settings>=2.13.1",
     "python-dotenv>=1.2.1",
     "uvicorn>=0.41.0",
 ]
