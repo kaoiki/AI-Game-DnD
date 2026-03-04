@@ -167,25 +167,41 @@ uv run pytest
 
 ```
 app/
-├── main.py
-├── core/
-│   ├── config.py
-│   ├── response.py
-│   └── logging.py
-├── api/
-│   └── router.py
-├── events/
-│   └── dispatcher.py
-└── tests/
+├── main.py                  # FastAPI 入口（app = FastAPI()）
+├── api/                     # HTTP 路由层（只放接口）
+│   ├── __init__.py
+│   ├── health.py            # /health
+│   └── invoke.py            # /invoke（事件总入口，仅分发骨架）
+├── core/                    # 基础设施层（项目“地基”）
+│   ├── __init__.py
+│   ├── config.py            # pydantic-settings：统一读取 .env
+│   ├── logging.py           # logging 基座（格式/请求id等）
+│   ├── response.py          # success()/error() 统一返回
+│   └── exceptions.py        # 全局异常处理（注册到 FastAPI）
+├── schemas/                 # 入参/出参模型（你说的 schema 控制）
+│   ├── __init__.py
+│   ├── base.py              # 公共模型（BaseResponse 等）
+│   └── invoke.py            # InvokeRequest / InvokeResponse（事件入口模型）
+├── events/                  # 事件体系（先骨架，不实现具体事件）
+│   ├── __init__.py
+│   ├── dispatcher.py        # 根据 event.type 分发
+│   └── types.py             # 事件类型常量/枚举（INIT 等）
+├── db/                      # DuckDB 相关（轻量持久化）
+│   ├── __init__.py
+│   ├── client.py            # duckdb 连接/初始化（最小封装）
+│   └── repo.py              # 简单读写封装（MVP 可非常薄）
+├── utils/                   # 工具函数（通用，不依赖业务）
+│   ├── __init__.py
+│   └── time.py              # 例如时间格式化/now等
+├── scripts/                 # 你现在这些“验证脚本/实验脚本”归档到这里
+│   ├── __init__.py
+│   ├── check_deepseek_sdk.py
+│   └── test_deepseek.py
+└── playground/              # 可选：保留你当前 DnD 相关实验，不污染主代码
+    ├── __init__.py
+    ├── dnd_agent.py
+    └── dnd_game.py
 ```
-
----
-
-## 📜 License
-
-MIT License
-
----
 
 ## 🎯 设计理念
 
@@ -195,3 +211,11 @@ MIT License
 * 统一入口，清晰分层
 * 可扩展，但不过度设计
 * 支持后续平滑演进至完整事件体系
+
+---
+
+## 📜 License
+
+MIT License
+
+---
