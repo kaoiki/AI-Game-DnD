@@ -3,8 +3,11 @@ import os
 import sys
 from dotenv import load_dotenv
 
-# 加载环境变量
-load_dotenv()
+# 找到 app 目录
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# 加载 app/.env
+load_dotenv(BASE_DIR / ".env")
 
 # 检查API密钥
 api_key = os.getenv("DEEPSEEK_API_KEY")
