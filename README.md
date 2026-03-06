@@ -213,9 +213,86 @@ app/
 * 支持后续平滑演进至完整事件体系
 
 ---
+```
+without pytest
+project/app/ run tests/check_[tag].py
+uv run python -m tests.check_config
+```
+---
+```
+logging
+nohup uv run gunicorn main:app > server.log 2>&1 &
+```
+---
+Health Check
+
+系统提供一个基础健康检查接口，用于确认服务是否正常运行。
+
+启动服务
+
+在 app 目录下执行：
+```
+uv run uvicorn main:app --reload
+```
+
+启动成功后会看到类似输出：
+```
+Uvicorn running on http://127.0.0.1:8000
+```
+
+然后请求他，方法为GET，例如 “curl http://127.0.0.1:8000/health”，你应该能收到如下响应：
+```
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "status": "ok"
+  }
+}
+```
+---
+## 🧪 Testing
+
+项目包含两类测试内容：
+
+- `test/`：基于 pytest 的自动化测试
+- `tests/`：开发阶段保留的手动验证脚本，用于快速检查底座模块行为，uv run python -m tests.check_{{tag}}。
+---
 
 ## 📜 License
 
 MIT License
+
+---
+
+最后一次测试时间：
+
+```
+2026-03-06
+uv run pytest
+```
+
+Pytest 运行结果如下：
+
+```
+==== test session starts ===
+platform darwin -- Python 3.10.18, pytest-9.0.2, pluggy-1.6.0
+rootdir: /Users/kaoiki/anaconda3/envs/deepseek-dnd/app
+configfile: pyproject.toml
+plugins: anyio-4.12.1
+collected 5 items
+
+test/test_config.py .     [ 20%]
+test/test_exceptions.py . [ 40%]
+test/test_health.py .     [ 60%]
+test/test_response.py ..  [100%]
+
+=== 5 passed in 0.97s ===
+```
+
+说明：
+
+* 所有基础模块测试均通过
+* 当前 **MVP 基础底座运行正常**
 
 ---
