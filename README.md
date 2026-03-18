@@ -268,6 +268,38 @@ MIT License
 最后一次测试时间：
 
 ```
+2026-03-18
+uv run pytest test/test_invoke.py -v
+```
+
+Pytest 运行结果如下：
+
+```
+==== test session starts ===
+platform darwin -- Python 3.10.18, pytest-9.0.2, pluggy-1.6.0 -- /Users/kaoiki/anaconda3/envs/deepseek-dnd/app/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/kaoiki/anaconda3/envs/deepseek-dnd/app
+configfile: pyproject.toml
+plugins: anyio-4.12.1
+collected 3 items
+
+test/test_invoke.py::test_invoke_init_success PASSED              [ 33%]
+test/test_invoke.py::test_invoke_invalid_event_type PASSED        [ 66%]
+test/test_invoke.py::test_invoke_unregistered_event_type PASSED   [100%]
+
+=== 5 passed in 0.97s ===
+```
+
+说明：
+
+* 所有基础模块测试均通过
+* 当前 **MVP 基础底座运行正常**
+
+---
+
+上一次测试时间：
+
+```
 2026-03-06
 uv run pytest
 ```
@@ -295,4 +327,3 @@ test/test_response.py ..  [100%]
 * 所有基础模块测试均通过
 * 当前 **MVP 基础底座运行正常**
 
----
