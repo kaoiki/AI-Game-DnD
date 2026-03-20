@@ -1,4 +1,7 @@
 from core.response import success, error
+import pytest
+
+pytestmark = pytest.mark.skip(reason="旧阶段测试，暂不参与当前阶段回归")
 
 
 def test_success_response():

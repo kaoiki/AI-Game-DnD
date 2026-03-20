@@ -264,8 +264,43 @@ Uvicorn running on http://127.0.0.1:8000
 MIT License
 
 ---
+测试时间：
 
-最后一次测试时间：
+```
+2026-03-20
+uv run pytest tests/test_init_invoke.py tests/test_init_prompt.py
+uv run pytest tests/test_init_invoke.py -k state_saved
+```
+
+Pytest 运行结果如下：
+
+=== test session starts ===
+
+platform darwin -- Python 3.10.18, pytest-9.0.2, pluggy-1.6.0
+rootdir: /Users/kaoiki/anaconda3/envs/deepseek-dnd/app
+configfile: pyproject.toml
+plugins: anyio-4.12.1
+collected 7 items
+
+test/test_init_invoke.py .....  [ 85%]
+test/test_init_prompt.py .  [100%]
+
+===  7 passed in 1.22s ===
+
+=== test session starts ===
+
+platform darwin -- Python 3.10.18, pytest-9.0.2, pluggy-1.6.0
+rootdir: /Users/kaoiki/anaconda3/envs/deepseek-dnd/app
+configfile: pyproject.toml
+plugins: anyio-4.12.1
+collected 6 items / 5 deselected / 1 selected
+
+test/test_init_invoke.py .  [100%]
+
+=== 1 passed, 5 deselected in 0.97s ====
+
+---
+测试时间：
 
 ```
 2026-03-18
@@ -297,7 +332,7 @@ test/test_invoke.py::test_invoke_unregistered_event_type PASSED   [100%]
 
 ---
 
-上一次测试时间：
+测试时间：
 
 ```
 2026-03-06
@@ -326,4 +361,104 @@ test/test_response.py ..  [100%]
 
 * 所有基础模块测试均通过
 * 当前 **MVP 基础底座运行正常**
+
+---
+## Demo
+
+提交
+```
+{
+  "event": {
+    "type": "init"
+  },
+  "session": {
+    "session_id": "sess_test_001",
+    "player_count": 1,
+    "difficulty": "NORMAL"
+  },
+  "time": {
+    "hard_limit_seconds": 300,
+    "elapsed_active_seconds": 0,
+    "remaining_seconds": 300
+  },
+  "seed": {
+    "run_seed": "run_test_001"
+  },
+  "constraints": {
+    "language": "zh",
+    "content_rating": "PG",
+    "max_chars_scene": 220,
+    "max_chars_option": 14,
+    "forbidden_terms": ["骰子", "扑克", "点数", "规则"]
+  },
+  "slots": {
+    "tone_bias": "恐怖刺激",
+    "theme_bias": "鬼屋",
+    "npc_bias": "恶鬼"
+  },
+  "client_context": {
+    "platform": "web",
+    "locale": "en-US"
+  },
+  "payload": {},
+  "context": {}
+}
+```
+
+答复
+```
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "event": {
+            "type": "init"
+        },
+        "payload": {
+            "ai_state": {
+                "world_seed": "run_test_001_haunted_mansion",
+                "title": "凶宅回响",
+                "tone": "恐怖刺激",
+                "memory_summary": "玩家独自进入一座传闻中的凶宅，恶鬼的低语在墙壁间回荡。",
+                "arc_progress": 0
+            },
+            "mainline": {
+                "premise": "你为了寻找失踪的朋友，深夜踏入这座被诅咒的宅邸。",
+                "player_role": "一位寻找失踪挚友的普通人",
+                "primary_goal": "在宅邸中找到朋友并活着离开",
+                "stakes": "若失败，你将永远成为这座凶宅的一部分"
+            },
+            "opening": {
+                "scene": "腐朽的木门在你身后吱呀关上。月光透过破窗，照亮空气中漂浮的尘埃。走廊深处传来指甲刮过木板的刺耳声响。",
+                "npc_line": "（一个扭曲的声音从阴影中传来）又一个送上门来的……留下来陪我吧……"
+            },
+            "start_hint": {
+                "how_to_play_next": "选择一个选项来行动，你的选择将决定接下来的遭遇。"
+            },
+            "options": [
+                {
+                    "id": 1,
+                    "text": "朝声音来源前进"
+                },
+                {
+                    "id": 2,
+                    "text": "检查旁边的房间"
+                },
+                {
+                    "id": 3,
+                    "text": "悄悄后退"
+                }
+            ],
+            "routing": {
+                "next_event_type": "DECISION",
+                "should_end": false
+            },
+            "meta": {
+                "trace_id": "init_run_test_001_20250418_001"
+            }
+        }
+    }
+}
+```
+---
 
