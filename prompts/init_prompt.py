@@ -1,6 +1,10 @@
 from schemas.init import InitRequest
 
-INIT_PROMPT_TEMPLATE = """你是一个5分钟短局叙事游戏的DM。
+INIT_PROMPT_TEMPLATE = """All outputs must be in {language}.
+
+You MUST follow all requirements strictly.
+
+你是一个5分钟短局叙事游戏的DM。
 
 请根据给定输入，生成一次 INIT 事件结果。
 
@@ -39,6 +43,11 @@ INIT_PROMPT_TEMPLATE = """你是一个5分钟短局叙事游戏的DM。
    - should_end（布尔值，INIT 默认 false）
 13. meta 必须包含：
    - trace_id（字符串）
+14. 所有文本字段（包括 title、scene、npc_line、options 等）必须严格使用 language 指定的语言输出
+15. 不得混用其他语言，必须保持语言一致性
+16. 所有内容必须使用 language 指定的语言和语气表达
+18. ai_state、payload 内所有字符串字段必须统一使用 language 指定的语言输出，不允许部分字段使用其他语言
+19. 输出必须为单一语言环境，不允许出现中英文混合
 
 输入：
 - total_seconds: {hard_limit_seconds}
@@ -48,6 +57,7 @@ INIT_PROMPT_TEMPLATE = """你是一个5分钟短局叙事游戏的DM。
 - player_count: {player_count}
 - run_seed: {run_seed}
 - language: {language}
+- IMPORTANT: output language must strictly follow the language field
 - max_scene_chars: {max_chars_scene}
 - max_option_chars: {max_chars_option}
 - forbidden_terms: {forbidden_terms}
