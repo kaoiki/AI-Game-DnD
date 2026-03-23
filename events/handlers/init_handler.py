@@ -58,7 +58,7 @@ class InitEventHandler(BaseEventHandler):
                 raw_text = self.provider.complete_prompt(
                     prompt,
                     temperature=0,
-                    max_tokens=600,
+                    max_tokens=1200,
                 )
                 print("===== LLM RAW OUTPUT START =====")
                 print(raw_text)
