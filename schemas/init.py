@@ -172,6 +172,13 @@ class InitOutputPayload(BaseModel):
             raise ValueError("option ids must be unique")
         return self
 
+class InitOutputContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_scene_summary: str = Field(..., min_length=1, description="当前场景摘要")
+    available_options: list[OptionItem] = Field(..., description="当前可选项快照")
+    state_flags: dict[str, Any] = Field(default_factory=dict, description="状态标记")
+
 
 class InitRouting(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -199,6 +206,7 @@ class InitResponse(BaseModel):
     event: EventInfo
     ai_state: InitAiState
     payload: InitOutputPayload
+    context: InitOutputContext
     routing: InitRouting
     meta: InitMeta
 
@@ -231,6 +239,14 @@ class InitResponse(BaseModel):
                     OptionItem(id=1, text="交出记忆"),
                     OptionItem(id=2, text="试探对方"),
                 ],
+                context=InitOutputContext(
+                    current_scene_summary="你站在钟塔门口，怀表在掌心发烫，一名神秘守塔人正在注视你。",
+                    available_options=[
+                        OptionItem(id=1, text="交出记忆"),
+                        OptionItem(id=2, text="试探对方"),
+                    ],
+                    state_flags={},
+                ),
             ),
             routing=InitRouting(
                 next_event_type="DECISION",
