@@ -38,16 +38,20 @@ You MUST follow all requirements strictly.
 11. 每个 option 必须包含：
    - id（整数）
    - text（字符串）
-12. routing 必须包含：
+12. context 必须包含：
+   - current_scene_summary（字符串）
+   - available_options（数组，内容应与 payload.options 对齐）
+   - state_flags（对象）
+13. routing 必须包含：
    - next_event_type（只能是 DECISION、COMBAT、PUZZLE、END）
    - should_end（布尔值，INIT 默认 false）
-13. meta 必须包含：
+14. meta 必须包含：
    - trace_id（字符串）
-14. 所有文本字段（包括 title、scene、npc_line、options 等）必须严格使用 language 指定的语言输出
-15. 不得混用其他语言，必须保持语言一致性
-16. 所有内容必须使用 language 指定的语言和语气表达
+15. 所有文本字段（包括 title、scene、npc_line、options 等）必须严格使用 language 指定的语言输出
+16. 不得混用其他语言，必须保持语言一致性
+17. 所有内容必须使用 language 指定的语言和语气表达
 18. ai_state、payload 内所有字符串字段必须统一使用 language 指定的语言输出，不允许部分字段使用其他语言
-19. 输出必须为单一语言环境，不允许出现中英文混合
+19. 输出必须为单一语言环境，不允许出现中文与非中文混合
 
 输入：
 - total_seconds: {hard_limit_seconds}
@@ -100,6 +104,14 @@ You MUST follow all requirements strictly.
     "next_event_type": "DECISION",
     "should_end": false
   }},
+  "context": {{
+      "current_scene_summary": "string",
+      "available_options": [
+        {{ "id": 1, "text": "string" }},
+        {{ "id": 2, "text": "string" }}
+      ],
+      "state_flags": {{}}
+    }},
   "meta": {{
     "trace_id": "string"
   }}

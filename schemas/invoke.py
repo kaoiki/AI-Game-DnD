@@ -46,4 +46,9 @@ class InvokeResponseData(BaseModel):
     """
 
     event: EventInfo = Field(..., description="当前响应对应的事件信息")
+    ai_state: dict[str, Any] = Field(default_factory=dict, description="AI状态数据")
     payload: dict[str, Any] = Field(default_factory=dict, description="事件返回载荷")
+    routing: dict[str, Any] = Field(default_factory=dict, description="路由控制信息")
+    context: dict[str, Any] = Field(default_factory=dict, description="事件上下文")
+    meta: dict[str, Any] = Field(default_factory=dict, description="元信息")
+    

@@ -60,6 +60,9 @@ class InitEventHandler(BaseEventHandler):
                     temperature=0,
                     max_tokens=600,
                 )
+                print("===== LLM RAW OUTPUT START =====")
+                print(raw_text)
+                print("===== LLM RAW OUTPUT END =====")
             except Exception as exc:
                 raise LLMInvokeError(f"DeepSeek invoke failed: {exc}") from exc
 
@@ -75,13 +78,10 @@ class InitEventHandler(BaseEventHandler):
                 raise LLMSchemaValidationError(f"InitResponse validation failed: {exc}") from exc
 
             response_payload = {
-                "ai_state": init_response.ai_state.model_dump(),
                 "mainline": init_response.payload.mainline.model_dump(),
                 "opening": init_response.payload.opening.model_dump(),
                 "start_hint": init_response.payload.start_hint.model_dump(),
                 "options": [item.model_dump() for item in init_response.payload.options],
-                "routing": init_response.routing.model_dump(),
-                "meta": init_response.meta.model_dump(),
             }
 
             self._save_state(init_request, init_response, response_payload)
@@ -90,8 +90,12 @@ class InitEventHandler(BaseEventHandler):
 
             return InvokeResponseData(
                 event=init_response.event,
+                ai_state=init_response.ai_state.model_dump(),
                 payload=response_payload,
-            )
+                routing=init_response.routing.model_dump(),
+                context=init_response.context.model_dump(),
+                meta=init_response.meta.model_dump(),
+            )   
 
         except (LLMEmptyResponseError, LLMJsonParseError, LLMSchemaValidationError, LLMInvokeError):
             raise
@@ -172,6 +176,7 @@ class InitEventHandler(BaseEventHandler):
         last_output = {
             "event": response.event.model_dump(),
             "payload": response_payload,
+            "context": response.context.model_dump(),
         }
 
         self.state_repo.save_snapshot(
