@@ -33,6 +33,41 @@ class Settings(BaseSettings):
 
     # LLM
     deepseek_api_key: str = Field(default="")
+    deepseek_api_url: str = Field(default="https://api.deepseek.cn/v1/chat/completions")
+    deepseek_base_url: str = Field(default="https://api.deepseek.com/v1")
+    deepseek_model: str = Field(default="deepseek-chat")
+    deepseek_timeout: int = Field(default=60)
+
+    # Event routing config
+    init_allowed_next_events_raw: str = Field(
+        default="decision,combat,puzzle"
+    )
+    loop_allowed_next_events_raw: str = Field(
+        default="decision,combat,puzzle,end"
+    )
+
+    @staticmethod
+    def _parse_event_csv(raw: str, fallback: list[str]) -> list[str]:
+        values: list[str] = []
+        for item in raw.split(","):
+            value = item.strip().lower()
+            if value and value not in values:
+                values.append(value)
+        return values or fallback
+
+    @property
+    def init_allowed_next_events(self) -> list[str]:
+        return self._parse_event_csv(
+            self.init_allowed_next_events_raw,
+            ["decision", "combat", "puzzle"],
+        )
+
+    @property
+    def loop_allowed_next_events(self) -> list[str]:
+        return self._parse_event_csv(
+            self.loop_allowed_next_events_raw,
+            ["decision", "combat", "puzzle", "end"],
+        )
 
 
 @lru_cache

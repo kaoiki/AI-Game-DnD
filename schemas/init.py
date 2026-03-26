@@ -183,11 +183,26 @@ class InitOutputContext(BaseModel):
 class InitRouting(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    next_event_type: Literal["DECISION", "COMBAT", "PUZZLE", "END"] = Field(
+    next_event_type: str = Field(
         ...,
-        description="下一事件类型建议",
+        min_length=1,
+        description="下一事件类型建议（由配置控制，使用小写）",
     )
     should_end: bool = Field(..., description="是否应结束流程")
+
+    @field_validator("next_event_type")
+    @classmethod
+    def validate_next_event_type(cls, v: str) -> str:
+        value = v.strip().lower()
+        if not value:
+            raise ValueError("next_event_type must not be empty")
+        return value
+
+    @model_validator(mode="after")
+    def validate_should_end(self):
+        if self.should_end:
+            raise ValueError("INIT should_end must be false")
+        return self
 
 
 class InitMeta(BaseModel):
@@ -239,14 +254,14 @@ class InitResponse(BaseModel):
                     OptionItem(id=1, text="交出记忆"),
                     OptionItem(id=2, text="试探对方"),
                 ],
-                context=InitOutputContext(
-                    current_scene_summary="你站在钟塔门口，怀表在掌心发烫，一名神秘守塔人正在注视你。",
-                    available_options=[
-                        OptionItem(id=1, text="交出记忆"),
-                        OptionItem(id=2, text="试探对方"),
-                    ],
-                    state_flags={},
-                ),
+            ),
+            context=InitOutputContext(
+                current_scene_summary="你站在钟塔门口，怀表在掌心发烫，一名神秘守塔人正在注视你。",
+                available_options=[
+                    OptionItem(id=1, text="交出记忆"),
+                    OptionItem(id=2, text="试探对方"),
+                ],
+                state_flags={},
             ),
             routing=InitRouting(
                 next_event_type="DECISION",
