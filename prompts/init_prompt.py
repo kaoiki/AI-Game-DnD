@@ -1,4 +1,8 @@
+import random
+
 from schemas.init import InitRequest
+from core.config import settings
+
 
 INIT_PROMPT_TEMPLATE = """All outputs must be in {language}.
 
@@ -43,7 +47,7 @@ You MUST follow all requirements strictly.
    - available_options（数组，内容应与 payload.options 对齐）
    - state_flags（对象）
 13. routing 必须包含：
-   - next_event_type（只能是 DECISION、COMBAT、PUZZLE、END）
+   - next_event_type（只能从 allowed_next_event_types 中选择）
    - should_end（布尔值，INIT 默认 false）
 14. meta 必须包含：
    - trace_id（字符串）
@@ -52,6 +56,8 @@ You MUST follow all requirements strictly.
 17. 所有内容必须使用 language 指定的语言和语气表达
 18. ai_state、payload 内所有字符串字段必须统一使用 language 指定的语言输出，不允许部分字段使用其他语言
 19. 输出必须为单一语言环境，不允许出现中文与非中文混合
+20. routing.next_event_type 必须从 allowed_next_event_types 中选择
+21. INIT 不应直接结束，should_end 必须为 false
 
 输入：
 - total_seconds: {hard_limit_seconds}
@@ -68,6 +74,12 @@ You MUST follow all requirements strictly.
 - tone_bias: {tone_bias}
 - theme_bias: {theme_bias}
 - npc_bias: {npc_bias}
+
+可建议的下一事件类型（必须从中选择）：
+{allowed_next_event_types}
+
+输出示例中的 next_event_type 样例值（仅示例，不代表固定写死）：
+{sample_next_event_type}
 
 输出示例结构：
 {{
@@ -101,17 +113,17 @@ You MUST follow all requirements strictly.
     ]
   }},
   "routing": {{
-    "next_event_type": "DECISION",
+    "next_event_type": "{sample_next_event_type}",
     "should_end": false
   }},
   "context": {{
-      "current_scene_summary": "string",
-      "available_options": [
-        {{ "id": 1, "text": "string" }},
-        {{ "id": 2, "text": "string" }}
-      ],
-      "state_flags": {{}}
-    }},
+    "current_scene_summary": "string",
+    "available_options": [
+      {{ "id": 1, "text": "string" }},
+      {{ "id": 2, "text": "string" }}
+    ],
+    "state_flags": {{}}
+  }},
   "meta": {{
     "trace_id": "string"
   }}
@@ -131,10 +143,53 @@ def _safe_text(value: str | None, default: str = "无") -> str:
 def _join_terms(terms: list[str]) -> str:
     if not terms:
         return "无"
-    return "、".join(terms)
+    normalized = [str(term).strip() for term in terms if str(term).strip()]
+    return "、".join(normalized) if normalized else "无"
 
 
-def render_init_prompt(request: InitRequest) -> str:
+def _normalize_event_name(name: str) -> str:
+    return str(name).strip().lower()
+
+
+def _get_allowed_next_event_types(
+    allowed_next_event_types: list[str] | None = None,
+) -> list[str]:
+    source = allowed_next_event_types or settings.init_allowed_next_events
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+
+    for item in source:
+        value = _normalize_event_name(item)
+        if value and value not in seen:
+            normalized.append(value)
+            seen.add(value)
+
+    if not normalized:
+        normalized = ["decision", "combat", "puzzle"]
+
+    return normalized
+
+
+def _join_allowed_event_types(
+    allowed_next_event_types: list[str] | None = None,
+) -> str:
+    return ", ".join(_get_allowed_next_event_types(allowed_next_event_types))
+
+
+def _sample_next_event_type(
+    allowed_next_event_types: list[str] | None = None,
+) -> str:
+    candidates = _get_allowed_next_event_types(allowed_next_event_types)
+    return random.choice(candidates)
+
+
+def render_init_prompt(
+    request: InitRequest,
+    allowed_next_event_types: list[str] | None = None,
+) -> str:
+    sample_next_event_type = _sample_next_event_type(allowed_next_event_types)
+
     return INIT_PROMPT_TEMPLATE.format(
         hard_limit_seconds=request.time.hard_limit_seconds,
         elapsed_active_seconds=request.time.elapsed_active_seconds,
@@ -149,4 +204,6 @@ def render_init_prompt(request: InitRequest) -> str:
         tone_bias=_safe_text(request.slots.tone_bias),
         theme_bias=_safe_text(request.slots.theme_bias),
         npc_bias=_safe_text(request.slots.npc_bias),
+        allowed_next_event_types=_join_allowed_event_types(allowed_next_event_types),
+        sample_next_event_type=sample_next_event_type,
     )

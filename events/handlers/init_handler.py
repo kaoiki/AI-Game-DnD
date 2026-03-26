@@ -14,6 +14,8 @@ from schemas.invoke import InvokeRequest, InvokeResponseData
 from services.ai.deepseek_client import DeepSeekProvider
 from utils.json_parser import parse_json_object
 
+from core.config import settings
+
 
 class InitEventHandler(BaseEventHandler):
     """
@@ -116,7 +118,10 @@ class InitEventHandler(BaseEventHandler):
         return request.model_copy(update={"time": normalized_time})
 
     def _build_prompt(self, request: InitRequest) -> str:
-        prompt = render_init_prompt(request)
+        prompt = render_init_prompt(
+            request,
+            allowed_next_event_types=settings.init_allowed_next_events,
+        )
 
         augmented_context = self._build_augmented_context(request)
         if augmented_context:
@@ -143,20 +148,35 @@ class InitEventHandler(BaseEventHandler):
 
     def _normalize_model_output(self, data: dict) -> dict:
         """
-        只做轻量容错，不替模型补业务核心字段。
-        允许修正：
-        - event.type 大小写
+        只做轻量归一化：
+        - event.type 强制小写
+        - routing.next_event_type 按 INIT 配置候选集兜底
         - routing.should_end 缺失时补默认 false
+        - INIT 不允许 should_end = true
         """
         event = data.get("event")
         if isinstance(event, dict):
-            event_type = event.get("type")
-            if isinstance(event_type, str):
-                event["type"] = event_type.lower()
+            event["type"] = "init"
 
         routing = data.get("routing")
-        if isinstance(routing, dict) and "should_end" not in routing:
-            routing["should_end"] = False
+        if not isinstance(routing, dict):
+            routing = {}
+            data["routing"] = routing
+
+        next_event_type = routing.get("next_event_type")
+        if isinstance(next_event_type, str):
+            next_event_type = next_event_type.strip().lower()
+        else:
+            next_event_type = None
+
+        allowed = settings.init_allowed_next_events
+        fallback = allowed[0] if allowed else "decision"
+
+        if not next_event_type or next_event_type not in allowed:
+            next_event_type = fallback
+
+        routing["next_event_type"] = next_event_type
+        routing["should_end"] = False
 
         return data
 
