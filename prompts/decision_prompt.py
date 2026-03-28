@@ -2,7 +2,7 @@ from schemas.decision import DecisionRequest
 from core.config import settings
 
 
-DECISION_PROMPT_TEMPLATE = """All outputs must be in {language}.
+DECISION_PROMPT_TEMPLATE = DECISION_PROMPT_TEMPLATE = """All outputs must be in {language}.
 
 You MUST follow all requirements strictly.
 
@@ -19,92 +19,83 @@ DECISION 的职责：
 - 给出下一事件建议（routing）
 
 你只负责内容生成，不负责最终事件调度。
-routing.next_event_type 只是“建议”，不是最终控制权。
 
 要求：
-1. 只输出一个合法 JSON 对象
-2. 不要输出解释、前言、Markdown、代码块
-3. event.type 必须是 "decision"（小写）
-4. ai_state 必须包含：
-   - world_seed
-   - title
-   - tone
-   - memory_summary
-   - arc_progress
-5. arc_progress 必须大于等于 0，且应体现剧情推进，不能倒退
-6. payload 必须包含：
-   - decision
-   - result
-   - scene
-   - options
-7. payload.decision 必须包含：
-   - selected_option_id
-   - selected_option_text
-8. payload.result 必须包含：
-   - outcome
-   - effect
-9. payload.scene 必须包含：
-   - summary
-   - npc_line
-10. options 数量必须是 2 到 4 个
-11. 每个 option 必须包含：
-   - id（整数）
-   - text（字符串）
-12. context 必须包含：
-   - current_scene_summary（字符串）
-   - available_options（数组，内容必须与 payload.options 对齐）
-   - state_flags（对象）
-13. routing 必须包含：
-   - next_event_type（只能从 allowed_next_event_types 中选择）
-   - should_end（布尔值）
-14. 如果 routing.next_event_type 是 "end"，则 should_end 必须为 true
-15. 如果 routing.next_event_type 不是 "end"，则 should_end 必须为 false
-16. meta 必须包含：
-   - trace_id（字符串）
-17. 所有文本字段（包括 title、memory_summary、outcome、effect、scene、npc_line、options 等）必须严格使用 language 指定的语言输出
-18. 不得混用其他语言，必须保持语言一致性
-19. 所有内容必须使用 language 指定的语言和语气表达
-20. 输出必须为单一语言环境，不允许出现中文与非中文混合
-21. payload.decision.selected_option_id 必须等于输入中的 selected_option_id
-22. payload.decision.selected_option_text 必须与输入中 selected_option_id 对应的选项文本一致
-23. 本次输出必须体现“选择 → 结果 → 新局面”
-24. options 必须是“下一步可执行动作”，不能是空泛描述
-25. options 必须能推动后续事件，不允许无关文案
-26. context.current_scene_summary 必须是 scene.summary 的压缩承接版本
-27. context.available_options 必须与 payload.options 一致
-28. 不要重写整个世界观，不要重复 INIT 开场，只推进当前局面
-29. 如果当前局面进入高压正面对抗，可建议 next_event_type 为 combat
-30. 如果当前局面进入机制破解/逻辑求解，可建议 next_event_type 为 puzzle
-31. 如果当前局面尚属一般推进，则建议 next_event_type 为 decision
-32. 如果剧情已达到收尾条件，才建议 next_event_type 为 end
-33. routing.next_event_type 必须基于“玩家本次选择的行为类型”来判断
-34. 如果玩家选择的选项与以下列表中的任何一项有关：
-- 调查
-- 观察
-- 聆听
-- 询问
-- 跟随线索
-→ 应建议 next_event_type 为 decision
-35. 如果玩家选择的选项与以下列表中的任何一项有关：
-- 解读符号
-- 触发机关
-- 选择顺序
-- 破解规则
-→ 应建议 next_event_type 为 puzzle
-36. 如果玩家选择的选项与以下列表中的任何一项有关：
-- 接近危险
-- 挑战存在威胁的对象
-- 进入可能受伤或失败的情境
-→ 应建议 next_event_type 为 combat
+1. 只输出 JSON
+2. event.type 必须是 "decision"
 
-37. 不要仅根据世界观（例如“试炼”“符文”“宝藏”）就默认选择 puzzle
+（中间原结构全部保持）
 
-38. routing 必须反映“当前动作带来的下一步玩法”，而不是当前场景的主题
+30. 如果当前局面进入机制破解 → puzzle
+31. 如果当前局面进入对抗 → combat
 
-39. 同一场景下，不同选项可以导向不同事件类型，这是合理的
-40. 禁止出现 forbidden_terms 中的词
-41. option.text 长度应尽量不超过 max_option_chars
-42. scene.summary 长度应尽量不超过 max_scene_chars
+32. 【强规则：终局判定（最高优先级）】
+如果满足以下任一情况，必须直接结束：
+- 玩家已完成目标
+- 已脱离主要威胁
+- 出现出口 / 终点 / 最终场景
+- arc_progress >= 80 且剧情明显收束
+
+则必须：
+- routing.next_event_type = "end"
+- routing.should_end = true
+
+33. 【禁止拖延 decision】
+不能为了“还有选项”而继续 decision
+
+34. 【终局优先级高于行为类型】
+即使行为属于探索/观察，只要接近终局 → end
+
+35. 仅在未达到终局时，才允许继续 decision
+36. 【强规则：避免连续 decision（最高优先级之一）】
+如果当前局面已经经历过 decision，且本次 options 明显指向：
+- 行动尝试 / 风险行为 → 必须转为 combat
+- 机制互动 / 解法尝试 → 必须转为 puzzle
+
+❗禁止连续两轮以上 decision（除非明确为纯信息补充且无风险）
+
+【强规则：行为驱动分流】
+必须根据 options 的语义强制分流：
+- 包含攻击、突进、强行突破、冒险行为 → combat
+- 包含解谜、操作机关、逻辑判断、破解 → puzzle
+- 仅当为低风险探索或信息收集 → 才允许 decision
+
+【禁止伪 decision】
+不允许生成“本质是行动但仍标记为 decision”的内容
+例如：
+- 已经发生冲突却仍然 decision ❌
+- 已进入解谜却仍然 decision ❌
+
+【终局信号识别（必须 end）】
+如果 scene 或 result 已经出现以下语义：
+- “出口出现 / 已可离开”
+- “目标已达成 / 核心问题已解决”
+- “威胁已消失 / 局势稳定”
+
+则必须：
+- routing.next_event_type = "end"
+- routing.should_end = true
+
+❗禁止在上述情况下继续 decision
+
+【decision 使用边界】
+decision 只能用于：
+- 信息获取
+- 轻度探索
+- 非直接风险选择
+
+一旦进入关键推进阶段，必须切换到 combat 或 puzzle 或 end
+37. 【强规则：npc_line 不可为空】
+payload.scene.npc_line 必须始终输出非空字符串，至少 1 个字符
+
+如果当前场景没有明确 NPC：
+- 可以使用环境低语
+- 可以使用自言自语
+- 可以使用远处回声
+- 可以使用系统提示式短句
+
+❗禁止输出空字符串
+❗禁止省略 npc_line
 
 输入：
 - total_seconds: {hard_limit_seconds}

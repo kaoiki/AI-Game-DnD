@@ -2,7 +2,7 @@ from core.config import settings
 from schemas.combat import CombatRequest
 
 
-COMBAT_PROMPT_TEMPLATE = """All outputs must be in {language}.
+COMBAT_PROMPT_TEMPLATE = COMBAT_PROMPT_TEMPLATE = """All outputs must be in {language}.
 
 You MUST follow all requirements strictly.
 
@@ -21,67 +21,189 @@ COMBAT 的职责：
 你只负责内容生成，不负责最终事件调度。
 routing.next_event_type 只是“建议”，不是最终控制权。
 
-要求：
+========================
+【最高优先级规则（不可被覆盖）】
+========================
+
+如果满足任一条件，必须立即结束本局（优先级高于所有规则）：
+
+1. 主要敌人被击杀 / 丧失行动能力
+2. 核心目标已达成（例如：夺旗 / 逃脱 / 获取关键物品）
+3. 当前冲突已失去继续战斗的意义
+4. 玩家死亡
+
+一旦触发：
+
+- routing.next_event_type = "end"
+- routing.should_end = true
+
+并且必须遵守：
+
+- ❌ 不允许生成新的敌人
+- ❌ 不允许因为“还有其他人/威胁”继续 combat
+- ❌ 不允许再进入 decision / puzzle
+- ❌ 不允许生成新的战斗循环
+
+（此规则优先级高于所有 routing / options 判断规则）
+
+========================
+基础要求
+========================
+
 1. 只输出一个合法 JSON 对象
 2. 不要输出解释、前言、Markdown、代码块
 3. event.type 必须是 "combat"（小写）
+
 4. ai_state 必须包含：
    - world_seed
    - title
    - tone
    - memory_summary
    - arc_progress
-5. arc_progress 必须大于等于 0，且应体现剧情推进，不能倒退
-6. COMBAT 是单回合事件：一次输出只允许推进 1 个回合结果
-7. payload 必须只包含：
+
+5. arc_progress 必须大于等于 0，且必须体现推进
+
+6. COMBAT 是单回合事件
+
+7. payload 只包含：
    - result
    - scene
    - options
+
 8. payload.result 必须包含：
    - player_action
    - enemy_action
    - outcome
    - damage_to_enemy
    - damage_to_player
+
 9. payload.scene 必须包含：
    - summary
+
 10. options 数量必须是 2 到 4 个
-11. 每个 option 必须包含：
-   - id（整数）
-   - text（字符串）
+
+11. option 必须包含：
+   - id
+   - text
+
 12. context 必须包含：
-   - current_scene_summary（字符串）
-   - available_options（数组，内容必须与 payload.options 对齐）
-   - state_flags（对象）
+   - current_scene_summary
+   - available_options（必须与 payload.options 完全一致）
+   - state_flags
+
 13. routing 必须包含：
-   - next_event_type（只能从 allowed_next_event_types 中选择）
+   - next_event_type（从 allowed_next_event_types 选择）
    - should_end（布尔值）
-14. 如果 routing.next_event_type 是 "end"，则 should_end 必须为 true
-15. 如果 routing.next_event_type 不是 "end"，则 should_end 必须为 false
-16. meta 必须包含：
-   - trace_id（字符串）
-17. 所有文本字段必须严格使用 language 指定的语言输出
-18. 不得混用其他语言，必须保持语言一致性
-19. 输出必须为单一语言环境，不允许出现中文与非中文混合
-20. 敌人名称不从输入中读取，你必须根据 current_scene_summary 自行生成一个合理且统一的敌人称呼，并体现在 enemy_action、outcome、scene.summary 中
-21. 你必须判断本回合结果是“玩家死亡”还是“玩家仍然活着”
-22. 如果玩家死亡，则 routing.next_event_type 必须建议为 "end"，且 should_end 必须为 true
-23. 如果玩家仍然活着，则 routing.next_event_type 必须从 allowed_next_event_types 中合理选择，且 should_end 必须为 false
-24. 你必须根据“本回合结算后下一步 options 的语义”决定 routing.next_event_type，而不是机械根据当前事件名选择
-25. 如果下一步 options 仍主要是在处理当前威胁，例如继续攻击、防守、闪避、反击、周旋、牵制、寻找弱点后进行攻击、在交战中呼叫支援等，则 next_event_type 应为 "combat"
-26. 只有当“破解机制”已经成为下一步的核心玩法时，next_event_type 才应为 "puzzle"
-27. 如果下一步 options 已经转为普通推进、探索、搜索、包扎、观察四周、检查战利品等，则 next_event_type 应为 "decision"
-28. 如果已经形成终局，则 next_event_type 必须建议为 "end"
-29. 不要重写整个世界观，不要重复 INIT 开场，只推进当前局面
-30. 本回合结果必须体现“玩家动作 → 敌方反应 → 回合结算”
-31. options 必须是“下一步可执行动作”，不能是空泛描述
-32. options 必须能推动后续事件，不允许无关文案
-33. options 的语义必须与 routing.next_event_type 保持一致
-34. context.current_scene_summary 必须是 scene.summary 的压缩承接版本
-35. context.available_options 必须与 payload.options 一致
-36. 禁止出现 forbidden_terms 中的词
-37. option.text 长度应尽量不超过 max_option_chars
-38. scene.summary 长度应尽量不超过 max_scene_chars
+
+14. 如果 next_event_type = "end"，则 should_end = true
+15. 否则 should_end = false
+
+16. meta 必须包含 trace_id
+
+17. 所有文本必须使用 language 指定语言
+18. 禁止混用语言
+
+========================
+战斗逻辑
+========================
+
+19. 敌人名称不得来自输入
+必须基于 current_scene_summary 生成统一敌人称呼
+
+20. 回合结构必须是：
+玩家动作 → 敌方反应 → 结果结算
+
+21. 你必须判断：
+- 玩家死亡
+- 或玩家存活
+
+如果玩家死亡：
+→ 必须结束（触发最高优先级规则）
+
+========================
+终局强化规则（补充）
+========================
+
+22. 如果 outcome 表达以下语义之一：
+
+- 击杀敌人
+- 敌人瘫痪 / 无法行动
+- 玩家已拿到核心目标（如战旗）
+
+→ 必须结束（直接触发最高优先级规则）
+
+23. 如果 arc_progress >= 80 且本回合是关键冲突：
+
+→ 高概率结束（优先判断是否终局）
+
+========================
+战斗推进规则
+========================
+
+24. 不允许多回合“无进展战斗”
+
+25. 每回合必须改变局势：
+- 位置变化
+- 状态变化
+- 威胁变化
+
+========================
+routing 规则（仅在未终局时生效）
+========================
+
+⚠️ 仅当“未触发终局规则”时，以下规则才生效：
+
+26. 根据 options 决定：
+
+- 战斗行为 → combat
+- 解谜行为 → puzzle
+- 普通推进 → decision
+
+========================
+高风险规则
+========================
+
+27. 高风险行为必须可能致死：
+
+例如：
+- 贴身硬拼
+- 强行突破
+- 无防护攻击
+
+→ 必须显著提高死亡概率
+
+28. 不允许所有结果都是安全胜利
+
+========================
+options 设计规则
+========================
+
+29. options 必须包含：
+
+- 至少1个推进关键局势
+- 至少1个高风险行为
+- 其他可为策略行为
+
+30. 禁止写出“终结/最后一击”等明确提示
+
+31. option.text 尽量不超过 max_option_chars
+
+========================
+context 规则
+========================
+
+32. current_scene_summary 必须是 scene.summary 的压缩版
+33. available_options 必须一致
+
+========================
+限制
+========================
+
+34. 禁止重复 INIT 开场
+35. 禁止生成无关剧情
+36. 禁止出现 forbidden_terms
+37. scene.summary 尽量不超过 max_scene_chars
+
 
 输入：
 - total_seconds: {hard_limit_seconds}

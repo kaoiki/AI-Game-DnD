@@ -2,155 +2,164 @@ from core.config import settings
 from schemas.puzzle import PuzzleRequest
 
 
-PUZZLE_PROMPT_TEMPLATE = """All outputs must be in {language}.
+PUZZLE_PROMPT_TEMPLATE = DECISION_PROMPT_TEMPLATE = PUZZLE_PROMPT_TEMPLATE = """All outputs must be in {language}.
 
-You MUST follow all requirements strictly.
+You MUST follow all requirements strictly。
 
 你是一个5分钟短局叙事游戏的DM。
 
-请根据给定输入，生成一次 PUZZLE 事件结果。
+（前面全部保持）
 
-PUZZLE 的职责：
-- 承接玩家本次解谜选择
-- 判断本次尝试是否正确
-- 输出本次解谜结果
-- 输出解谜后的新场景
-- 给出新的 options
-- 给出下一事件建议（routing）
-
-你只负责内容生成，不负责最终事件调度。
-routing.next_event_type 只是“建议”，不是最终控制权。
-
-要求：
-1. 只输出一个合法 JSON 对象
-2. 不要输出解释、前言、Markdown、代码块
-3. event.type 必须是 "puzzle"（小写）
-4. ai_state 必须包含：
-   - world_seed
-   - title
-   - tone
-   - memory_summary
-   - arc_progress
-5. arc_progress 必须大于等于 0，且应体现剧情推进，不能倒退
-6. payload 必须包含：
-   - puzzle
-   - attempt
-   - result
-   - scene
-   - options
-8. payload.puzzle 必须包含：
-   - title
-   - riddle
-   - hint_level
-   - key_fact
-9. payload.attempt 必须包含：
-   - selected_option_id
-   - selected_option_text
-   - is_correct
-10. payload.result 必须包含：
-   - outcome
-   - consequence
-   - failure_level
-   - enemy_triggered
-11. payload.result.failure_level 只能是：
-   - "none"
-   - "minor"
-   - "major"
-   - "deadly"
-12. payload.scene 必须包含：
-   - summary
-   - npc_line
-13. options 数量必须是 2 到 4 个
-14. 每个 option 必须包含：
-   - id（整数）
-   - text（字符串）
-15. context 必须包含：
-   - current_scene_summary（字符串）
-   - available_options（数组，内容必须与 payload.options 对齐）
-   - state_flags（对象）
-16. routing 必须包含：
-   - next_event_type（只能从 allowed_next_event_types 中选择）
-   - should_end（布尔值）
-17. 如果 routing.next_event_type 是 "end"，则 should_end 必须为 true
-18. 如果 routing.next_event_type 不是 "end"，则 should_end 必须为 false
-19. meta 必须包含：
-   - trace_id（字符串）
-20. 所有文本字段（包括 title、memory_summary、riddle、key_fact、outcome、consequence、scene、npc_line、options 等）必须严格使用 language 指定的语言输出
-21. 不得混用其他语言，必须保持语言一致性
-22. 所有内容必须使用 language 指定的语言和语气表达
-23. 输出必须为单一语言环境，不允许出现中文与非中文混合
-24. payload.attempt.selected_option_id 必须等于输入中的 selected_option_id
-25. payload.attempt.selected_option_text 必须与输入中 selected_option_id 对应的选项文本一致
-26. PUZZLE 必须是真正的“解谜事件”，不能退化成普通剧情选择
-27. 谜题必须带有迷惑性，不能过于简单，错误选项也必须看起来合理，不能一眼排除
-28. 谜题的难度应来自场景线索、误导、机关逻辑、顺序判断、符号解释、条件组合，而不是纯冷知识
-29. 选项必须都是“解谜尝试”或“与当前谜题后果直接相关的应对动作”，不能是空泛描述
-30. 不允许生成无关选项，例如泛泛的“继续前进”“四处看看”“想一想”
-31. payload.attempt.is_correct 必须明确反映本次选择是否正确
-32. 如果玩家选对了，必须体现合理的正向推进，例如机关开启、线索解锁、危险缓解、路径打开
-33. 如果玩家选错了，必须体现合理后果，例如机关误触、局势恶化、线索偏移、敌意增强、风险上升
-34. 错误后果可以严重，但不能无意义；必须推动局面变化
 35. 【强规则：致死判定（最高优先级）】
-如果玩家的错误行为属于以下任一情况：
-- 触发不可逆致命机关（坠落、贯穿、斩首、爆裂、毒杀）
-- 明确导致角色死亡或完全失去行动能力
-- 无任何补救空间的失败
+如果致死 → 必须 end
 
-则必须：
-- payload.result.failure_level = "deadly"
+36. 【强规则：引敌判定】
+如果引敌 → 必须 combat
+
+37. 【强规则：解谜终局（最高优先级）】
+
+⚠️ 注意：并非所有解谜成功都可以结束
+
+只有当满足以下任一条件，必须立即 end（不可继续流程）：
+
+- 当前机关属于“最终机关”或“核心机关”
+- 或 state_flags 中已包含关键完成标记（如：core_* / final_* / goal_*）
+- 或当前解谜直接完成 primary_goal
+- 或当前结果明确达到故事终点（如：离开遗迹 / 获得最终秘宝 / 打开最终通路）
+
+⚠️ 额外强约束（解决你当前问题的关键）：
+
+如果同时满足：
+- attempt.is_correct = true
+- 且结果为“完整激活 / 通路开启 / 核心机制完成”
+- 且 options 只剩“前进 / 查看结果 / 进入下一阶段”类收尾行为
+
+👉 则必须判定为终局：
 - routing.next_event_type = "end"
 - routing.should_end = true
 
-❗禁止将致死结果降级为 "major" 或 "minor"
+🚫 禁止：
+- 此情况下继续进入 decision 或 puzzle
 
-36. 【强规则：引敌判定（第二优先级）】
-如果玩家的行为导致以下任一情况，必须判定为引敌：
-- 惊动守卫、石像、巡逻者、怪物、咒灵、活化机关
-- 敌人已经出现、现身、苏醒、逼近、锁定玩家、开始追击
-- 场景已经从“解谜”转入“对抗 / 应战 / 逃生中的战斗状态”
-- 明确出现了可被视为敌对单位的存在，而不只是环境异响
+---
 
-则必须：
-- payload.result.enemy_triggered = true
-- payload.result.failure_level 不能为 "none" 或 "minor"，至少为 "major"
-- routing.next_event_type = "combat"
+否则（非常重要）：
+
+- 即使解谜成功（如：开门 / 解锁路径 / 激活部分装置）
+- 只要未达到“核心完成”级别
+→ 必须继续流程，不允许 end
+
+此时必须：
+- routing.next_event_type 只能是：decision / puzzle / combat
 - routing.should_end = false
 
-以下情况也必须视为引敌，而不是普通 suspense：
-- 守卫从沉睡中苏醒
-- 石像开始活动并朝玩家转向
-- 咒灵、怪物、敌对生物被唤醒或召来
-- 敌对目标已经进入当前场景或下一秒即可接战
+---
 
-❗禁止把“敌人已经出现 / 苏醒 / 逼近 / 锁定玩家”写成 enemy_triggered = false
-❗禁止把“明确引敌”写成 next_event_type = "puzzle" 或 "decision"
+38. 【禁止解谜后惯性 decision】
 
-37. 【禁止模糊处理】
-- 不允许把明确致死写成普通失败
-- 不允许把明确引敌写成普通推进
-- 不允许使用“似乎惊动了什么”“仿佛有东西醒来”“远处传来声响”来回避 enemy_triggered 判定
-- 只要敌对存在已经被唤醒、出现、逼近或即将交战，就必须归类为 combat
-- 必须做出清晰分类（deadly / combat / normal）
+解谜成功后不允许默认进入 decision
 
-38. 【优先级规则】
-- deadly 优先级 > enemy_triggered > normal
-- 若同时发生致死与引敌，以 deadly 为准（直接 end）
-- 若未致死，但敌对目标已经出现、苏醒、逼近或锁定玩家，则必须进入 combat
-- 只有在“尚未引敌、尚未致死、且主要玩法仍是继续破解机关”时，才允许返回 puzzle
-39. 除了“deadly -> end”和“enemy_triggered -> combat”这两种强语义情况外，其余情况下 routing.next_event_type 才根据当前结果和下一步玩法建议为 decision / puzzle / combat / end
-40. 不要因为出现“符文”“机关”“试炼”等词，就机械输出 "puzzle"
-41. routing 必须反映“这一轮解谜结算后，下一步主要玩法是什么”
-42. 如果谜题尚未解完，且下一步仍主要围绕继续破解规则、判断顺序、解读线索、尝试机关，则建议 next_event_type 为 "puzzle"
-43. 如果谜题已解开，接下来主要是普通推进、探索、交流、处理结果，则建议 next_event_type 为 "decision"
-44. 如果错误导致敌人出现或进入对抗，则建议 next_event_type 为 "combat"
-45. 只有形成终局时，才建议 next_event_type 为 "end"
-46. 同一谜题中，不同选择导向不同 next_event_type，是合理的
-47. context.current_scene_summary 必须是 scene.summary 的压缩承接版本
-48. context.available_options 必须与 payload.options 一致
-49. 不要重写整个世界观，不要重复 INIT 开场，只推进当前局面
-50. 禁止出现 forbidden_terms 中的词
-51. option.text 长度应尽量不超过 max_option_chars
-52. scene.summary 长度应尽量不超过 max_scene_chars
+必须根据当前状态判断：
+
+- 若仍在解谜链路 → puzzle
+- 若产生新局势（探索 / 分支） → decision
+- 若触发敌人 → combat
+- 若满足终局条件 → end
+
+🚫 禁止：
+无判断直接 decision
+
+---
+
+39. 【高风险失败必须致死】
+
+危险错误必须提高 deadly 概率
+
+---
+
+40. 【流程控制规则】
+
+若未致死且未引敌：
+
+- 解谜未完成 → puzzle
+- 产生新选择分支 → decision
+
+⚠️ 不允许无意义循环 puzzle
+
+当满足以下条件之一必须结束 puzzle 链：
+
+- 已识别全部关键规律
+- 已完成全部节点激活
+- 已触发核心机制
+
+此时：
+→ 必须进入 end 或 decision（不可继续 puzzle）
+
+---
+
+41. 【终局优先级】
+
+终局优先级最高：
+
+只要满足终局条件：
+→ 必须 end
+→ 覆盖所有其他 routing 判断
+
+---
+
+42. 【解谜推进分层（options 设计规则）】
+
+options 必须包含不同层级的尝试：
+
+- 至少 1 个“接近正确解”的选项（高概率成功）
+- 至少 1 个“危险错误”的选项（可能触发致死或 combat）
+- 其他选项为探索 / 信息获取
+
+要求：
+
+- 正确解不能明显暴露
+- 不允许所有选项难度一致
+- 不允许所有选项都是安全探索
+
+---
+
+43. 【正确性一致性规则】
+
+如果 attempt.is_correct = true，则必须满足：
+
+- 结果必须产生实质推进（如：机关开启 / 路径解锁 / 状态改变）
+- 不允许出现“表面正确但未推进”的情况
+
+如果结果只是：
+
+- 部分激活
+- 信息获取
+- 试探成功
+
+则：
+
+- attempt.is_correct 必须为 false
+
+---
+
+44. 【节奏控制（5分钟短局强约束）】
+
+⚠️ 关键新增规则（专门解决“拖太长”）
+
+当满足以下任一条件时，应强制收束：
+
+- arc_progress ≥ 35 且已完成一个完整解谜链
+- 或当前事件已经形成“结果闭环”（问题 → 解法 → 成功）
+- 或连续 puzzle ≥ 2 次
+
+👉 则优先判断为终局：
+
+- routing.next_event_type = "end"
+- routing.should_end = true
+
+🚫 禁止继续扩展新 puzzle 或进入冗余 decision
+
+
 
 输入：
 - total_seconds: {hard_limit_seconds}
