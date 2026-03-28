@@ -226,6 +226,10 @@ class PuzzleEventHandler(BaseEventHandler):
         if not scene.get("summary"):
             scene["summary"] = request.context.current_scene_summary
 
+        npc_line = scene.get("npc_line")
+        if not isinstance(npc_line, str) or not npc_line.strip():
+            scene["npc_line"] = "空气微微震荡，却没有任何存在回应你，仿佛一切都在等待你的下一步。"
+
         options = payload.get("options")
         if not isinstance(options, list) or not options:
             options = [
@@ -268,22 +272,76 @@ class PuzzleEventHandler(BaseEventHandler):
             allowed[0] if allowed else "decision"
         )
 
+        # 读取关键状态，做“终局强制收束”
+        state_flags = context.get("state_flags")
+        if not isinstance(state_flags, dict):
+            state_flags = {}
+            context["state_flags"] = state_flags
+
+        arc_progress = 0
+        ai_state = data.get("ai_state")
+        if isinstance(ai_state, dict):
+            raw_arc_progress = ai_state.get("arc_progress")
+            if isinstance(raw_arc_progress, int):
+                arc_progress = raw_arc_progress
+
+        # 终局判断依据
+        core_or_final_solved = any(
+            str(k).startswith(("core_", "final_", "goal_")) and bool(v)
+            for k, v in state_flags.items()
+        )
+
+        passage_opened = state_flags.get("passage_opened") is True
+        exit_opened = state_flags.get("exit_opened") is True
+        gate_opened = state_flags.get("gate_opened") is True
+        primary_goal_done = state_flags.get("primary_goal_completed") is True
+
+        # 只剩“收尾动作”时，也应认为进入终局阶段
+        options = payload.get("options")
+        if not isinstance(options, list):
+            options = []
+
+        closing_keywords = ("进入", "前进", "走下", "离开", "查看", "检查", "聆听")
+        only_closing_actions = bool(options) and all(
+            isinstance(item, dict)
+            and isinstance(item.get("text"), str)
+            and any(keyword in item["text"] for keyword in closing_keywords)
+            for item in options
+        )
+
+        should_force_end = False
+
         # 强语义规则优先级最高：
         # 1. deadly -> end
         # 2. enemy_triggered -> combat
+        # 3. 核心机关完成 -> end
         if failure_level == "deadly":
-            next_event_type = "end" if "end" in allowed else fallback_non_end
+            should_force_end = True
         elif enemy_triggered:
             next_event_type = "combat" if "combat" in allowed else fallback_non_end
         else:
-            if not next_event_type:
-                next_event_type = fallback_non_end
-
-            if next_event_type not in allowed:
-                if routing.get("should_end") is True and "end" in allowed:
-                    next_event_type = "end"
-                else:
+            if (
+                "end" in allowed
+                and (
+                    primary_goal_done
+                    or (core_or_final_solved and (passage_opened or exit_opened or gate_opened))
+                    or (core_or_final_solved and arc_progress >= 30)
+                    or (arc_progress >= 35 and only_closing_actions)
+                )
+            ):
+                should_force_end = True
+            else:
+                if not next_event_type:
                     next_event_type = fallback_non_end
+
+                if next_event_type not in allowed:
+                    if routing.get("should_end") is True and "end" in allowed:
+                        next_event_type = "end"
+                    else:
+                        next_event_type = fallback_non_end
+
+        if should_force_end:
+            next_event_type = "end"
 
         routing["next_event_type"] = next_event_type
         routing["should_end"] = next_event_type == "end"
