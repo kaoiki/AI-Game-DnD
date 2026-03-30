@@ -75,7 +75,11 @@ class PuzzleEventHandler(BaseEventHandler):
                 ) from exc
 
             response_payload = {
-                "puzzle": puzzle_response.payload.puzzle.model_dump(),
+                "puzzle": (
+                    puzzle_response.payload.puzzle.model_dump()
+                    if puzzle_response.payload.puzzle is not None
+                    else None
+                ),
                 "attempt": puzzle_response.payload.attempt.model_dump(),
                 "result": puzzle_response.payload.result.model_dump(),
                 "scene": puzzle_response.payload.scene.model_dump(),
