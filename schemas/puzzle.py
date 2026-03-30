@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -164,7 +164,7 @@ class PuzzleScene(BaseModel):
 class PuzzlePayloadOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    puzzle: PuzzleCore
+    puzzle: Optional[PuzzleCore] = None
     attempt: PuzzleAttempt
     result: PuzzleResult
     scene: PuzzleScene
